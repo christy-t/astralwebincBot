@@ -22,12 +22,16 @@ export default async function handler(req, res) {
   let body = '';
   req.on('data', (chunk) => {
     body += chunk;
+    console.log('Receiving data chunk');
   });
+
   req.on('end', async () => {
+    console.log('Request end, body:', body);
     try {
       const parsedBody = JSON.parse(body);
       console.log('Webhook triggered:', parsedBody);
-      const events = parsedBody.events;
+
+      const events = parsedBody.events || [];
       for (const event of events) {
         if (event.type === 'message' && event.message.type === 'text') {
           try {
@@ -46,14 +50,16 @@ export default async function handler(req, res) {
                 ],
               },
             });
+            console.log('Reply sent to LINE');
           } catch (err) {
             console.error(
               'LINE reply error:',
               err.originalError?.response?.data || err
             );
           }
+        } else {
+          console.log('Event not handled:', event);
         }
-        // 這裡之後會串接 Notion API
       }
       res.status(200).end();
     } catch (err) {
@@ -61,9 +67,14 @@ export default async function handler(req, res) {
       res.status(500).end();
     }
   });
+
+  req.on('error', (err) => {
+    console.error('Request error:', err);
+    res.status(500).end();
+  });
 }
 
-// 最下方加上這段
+// 只保留這個 config
 export const config = {
   api: {
     bodyParser: false,

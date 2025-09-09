@@ -12,6 +12,7 @@ export default async function handler(req, res) {
     res.status(405).end();
     return;
   }
+  console.log('Webhook triggered:', req.body); // 新增這行
   const events = req.body.events;
   for (const event of events) {
     if (event.type === 'message' && event.message.type === 'text') {

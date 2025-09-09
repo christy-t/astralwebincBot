@@ -12,25 +12,32 @@ export default async function handler(req, res) {
     res.status(405).end();
     return;
   }
-  console.log('Webhook triggered:', req.body); // 新增這行
+  console.log('Webhook triggered:', req.body);
   const events = req.body.events;
   for (const event of events) {
     if (event.type === 'message' && event.message.type === 'text') {
-      await lineClient.replyMessage(event.replyToken, {
-        type: 'template',
-        altText: '請選擇動作',
-        template: {
-          type: 'buttons',
-          text: `你要將這個問題上傳到 Notion 嗎？\n\n"${event.message.text}"`,
-          actions: [
-            {
-              type: 'postback',
-              label: '上傳到 Notion',
-              data: JSON.stringify({ action: 'upload', question: event.message.text }),
-            },
-          ],
-        },
-      });
+      try {
+        await lineClient.replyMessage(event.replyToken, {
+          type: 'template',
+          altText: '請選擇動作',
+          template: {
+            type: 'buttons',
+            text: `你要將這個問題上傳到 Notion 嗎？\n\n"${event.message.text}"`,
+            actions: [
+              {
+                type: 'postback',
+                label: '上傳到 Notion',
+                data: JSON.stringify({ action: 'upload', question: event.message.text }),
+              },
+            ],
+          },
+        });
+      } catch (err) {
+        console.error(
+          'LINE reply error:',
+          err.originalError?.response?.data || err
+        );
+      }
     }
     // 這裡之後會串接 Notion API
   }

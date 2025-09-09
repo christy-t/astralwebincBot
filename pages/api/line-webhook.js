@@ -1,11 +1,11 @@
 import { Client } from '@line/bot-sdk';
 
-const config = {
+const lineConfig = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
   channelSecret: process.env.LINE_CHANNEL_SECRET,
 };
 
-const lineClient = new Client(config);
+const lineClient = new Client(lineConfig);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

@@ -7,12 +7,6 @@ const config = {
 
 const lineClient = new Client(config);
 
-export const configApi = {
-  api: {
-    bodyParser: false,
-  },
-};
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).end();
@@ -74,7 +68,6 @@ export default async function handler(req, res) {
   });
 }
 
-// 只保留這個 config
 export const config = {
   api: {
     bodyParser: false,

@@ -12,6 +12,8 @@
   "type": "commonjs",
   "dependencies": {
     "@line/bot-sdk": "^10.2.0",
-    "@notionhq/client": "^5.0.0"
+    "@notionhq/client": "^5.0.0",
+    "imgur-anonymous-uploader": "^1.1.7",
+    "node-fetch": "^3.3.2"
   }
 }

@@ -11,8 +11,10 @@ const NOTION_DATABASE_ID = process.env.NOTION_DATABASE_ID;
 const lineClient = new Client(lineConfig);
 
 export default async function handler(req, res) {
+  // 先回應 LINE 平台，避免重複送達
+  res.status(200).end();
+
   if (req.method !== 'POST') {
-    res.status(405).end();
     return;
   }
 
@@ -28,24 +30,18 @@ export default async function handler(req, res) {
       const events = parsedBody.events || [];
       
       for (const event of events) {
-        console.log('處理事件:', event.type);
-        
-        if (event.type === 'message') {
-          // 檢查是否為回覆訊息
-          const replyMessage = event.message.replyToken;
-          const quotedMessage = event.message.quoteToken || 
-                              event.message.quote?.text || 
-                              event.message.quotedMessage?.text;
-          
-          console.log('回覆token:', replyMessage);
-          console.log('引用的訊息:', quotedMessage);
-          console.log('訊息類型:', event.message.type);
-          console.log('訊息內容:', event.message.text);
+        // 忽略重複送達的事件
+        if (event.deliveryContext?.isRedelivery) {
+          console.log('忽略重複事件');
+          continue;
+        }
 
+        if (event.type === 'message') {
+          const messageText = event.message.text?.trim();
+          
           // 處理新的 QA 問題
-          if (event.message.type === 'text' && event.message.text.trim().startsWith('QA')) {
-            console.log('處理新 QA');
-            const questionText = event.message.text.trim().substring(2).trim();
+          if (event.message.type === 'text' && messageText?.startsWith('QA')) {
+            const questionText = messageText.substring(2).trim();
             if (questionText) {
               try {
                 await notion.pages.create({
@@ -59,29 +55,36 @@ export default async function handler(req, res) {
                     }
                   }
                 });
-                await lineClient.replyMessage(event.replyToken, {
-                  type: 'text',
-                  text: '已自動上傳到 Notion！'
-                });
+
+                try {
+                  await lineClient.replyMessage(event.replyToken, {
+                    type: 'text',
+                    text: '已自動上傳到 Notion！'
+                  });
+                } catch (replyErr) {
+                  console.error('LINE 回覆錯誤:', replyErr);
+                }
               } catch (err) {
                 console.error('Notion 上傳錯誤:', err);
-                await lineClient.replyMessage(event.replyToken, {
-                  type: 'text',
-                  text: '上傳失敗，請稍後再試。'
-                });
+                try {
+                  await lineClient.replyMessage(event.replyToken, {
+                    type: 'text',
+                    text: '上傳失敗，請稍後再試。'
+                  });
+                } catch (replyErr) {
+                  console.error('LINE 錯誤回覆失敗:', replyErr);
+                }
               }
             }
           }
-          
+
           // 處理回覆
-          else if (quotedMessage) {
-            console.log('處理回覆訊息');
-            // 取得原始問題（可能包含或不包含 QA 前綴）
-            const originalQuestion = quotedMessage.startsWith('QA') ? 
-              quotedMessage.substring(2).trim() : quotedMessage.trim();
-            
-            console.log('查詢 Notion:', originalQuestion);
-            
+          const quotedMsg = event.message.quote?.text || event.message.quotedMessage?.text;
+          if (quotedMsg) {
+            console.log('處理回覆訊息:', quotedMsg);
+            const originalQuestion = quotedMsg.startsWith('QA') ? 
+              quotedMsg.substring(2).trim() : quotedMsg.trim();
+
             try {
               const response = await notion.databases.query({
                 database_id: NOTION_DATABASE_ID,
@@ -90,12 +93,9 @@ export default async function handler(req, res) {
                   title: { equals: originalQuestion }
                 }
               });
-              
-              console.log('Notion 查詢結果:', response.results.length);
 
               if (response.results.length > 0) {
                 const page = response.results[0];
-                console.log('找到對應頁面:', page.id);
                 const oldAnswer = page.properties.answer?.rich_text?.[0]?.text?.content || '';
                 
                 let newContent = '';
@@ -110,8 +110,6 @@ export default async function handler(req, res) {
                   ? `${oldAnswer}\n---\n${newContent}`
                   : newContent;
 
-                console.log('更新 answer:', newAnswer);
-
                 await notion.pages.update({
                   page_id: page.id,
                   properties: {
@@ -121,33 +119,38 @@ export default async function handler(req, res) {
                   }
                 });
 
-                await lineClient.replyMessage(event.replyToken, {
-                  type: 'text',
-                  text: '已更新回答到 Notion！'
-                });
+                try {
+                  await lineClient.replyMessage(event.replyToken, {
+                    type: 'text',
+                    text: '已更新回答到 Notion！'
+                  });
+                } catch (replyErr) {
+                  console.error('LINE 回覆錯誤:', replyErr);
+                }
               } else {
                 console.log('找不到對應的問題');
               }
             } catch (err) {
               console.error('更新回答錯誤:', err);
-              await lineClient.replyMessage(event.replyToken, {
-                type: 'text',
-                text: '更新回答失敗，請稍後再試。'
-              });
+              try {
+                await lineClient.replyMessage(event.replyToken, {
+                  type: 'text',
+                  text: '更新回答失敗，請稍後再試。'
+                });
+              } catch (replyErr) {
+                console.error('LINE 錯誤回覆失敗:', replyErr);
+              }
             }
           }
         }
       }
-      res.status(200).end();
     } catch (err) {
       console.error('Webhook 處理錯誤:', err);
-      res.status(500).end();
     }
   });
 
   req.on('error', (err) => {
     console.error('請求錯誤:', err);
-    res.status(500).end();
   });
 }
 

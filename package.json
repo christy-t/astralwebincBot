@@ -1,15 +1,14 @@
 {
   "name": "line-notion-bot",
   "version": "1.0.0",
-  "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start"
   },
   "dependencies": {
-    "next": "^12.0.0",
-    "react": "^17.0.2",
-    "react-dom": "^17.0.2"
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest"
   }
 }

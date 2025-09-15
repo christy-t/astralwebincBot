@@ -11,19 +11,21 @@ const NOTION_DATABASE_ID = process.env.NOTION_DATABASE_ID;
 const lineClient = new Client(lineConfig);
 
 export default async function handler(req, res) {
-  // 先回應 LINE 平台，避免重複送達
-  res.status(200).end();
-
   if (req.method !== 'POST') {
-    return;
+    return res.status(405).end();
   }
 
-  let body = '';
-  req.on('data', (chunk) => {
-    body += chunk;
+  // 使用 Promise 來確保完整接收請求內容
+  const body = await new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', chunk => {
+      data += chunk;
+    });
+    req.on('end', () => resolve(data));
+    req.on('error', reject);
   });
 
-  req.on('end', async () => {
+  try {
     try {
       const parsedBody = JSON.parse(body);
       console.log('收到 webhook:', JSON.stringify(parsedBody, null, 2));
@@ -146,12 +148,12 @@ export default async function handler(req, res) {
       }
     } catch (err) {
       console.error('Webhook 處理錯誤:', err);
+      return res.status(500).json({ error: '內部伺服器錯誤' });
     }
-  });
-
-  req.on('error', (err) => {
-    console.error('請求錯誤:', err);
-  });
+  } finally {
+    // 確保所有處理完成後才回應 LINE 平台
+    res.status(200).end();
+  }
 }
 
 export const config = {

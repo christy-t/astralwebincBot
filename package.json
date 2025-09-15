@@ -7,10 +7,10 @@
     "start": "next start"
   },
   "dependencies": {
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "@line/bot-sdk": "latest",
-    "@notionhq/client": "latest"
+    "next": "13.5.4",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "@line/bot-sdk": "7.5.2",
+    "@notionhq/client": "2.2.13"
   }
 }

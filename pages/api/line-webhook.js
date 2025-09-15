@@ -41,14 +41,17 @@ async function handleNewQuestion(questionText, replyToken) {
 // 處理回覆更新到 Notion
 async function handleReply(newContent, replyToken) {
   try {
-    const response = await notion.databases.query({
-      database_id: NOTION_DATABASE_ID,
-      sorts: [
-        {
-          property: "date",
-          direction: "descending"
-        }
-      ],
+    console.log('查詢 Notion 資料庫...');
+    // 使用 search API 來獲取最新的頁面
+    const response = await notion.search({
+      filter: {
+        property: 'object',
+        value: 'page'
+      },
+      sort: {
+        direction: 'descending',
+        timestamp: 'last_edited_time'
+      },
       page_size: 1
     });
 

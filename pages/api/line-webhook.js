@@ -10,14 +10,60 @@ const NOTION_DATABASE_ID = process.env.NOTION_DATABASE_ID;
 
 const lineClient = new Client(lineConfig);
 
-// 處理新增問題到 Notion
-async function handleNewQuestion(questionText, replyToken) {
+// 取得用戶資訊
+async function getUserProfile(userId) {
   try {
+    const profile = await lineClient.getProfile(userId);
+    return profile;
+  } catch (err) {
+    console.error('獲取用戶資料失敗:', err);
+    return null;
+  }
+}
+
+// 從訊息中提取專案名稱
+function extractProject(text) {
+  const projectMatch = text.match(/^project:\s*(.+?)(?:\n|$)/i);
+  return projectMatch ? projectMatch[1].trim() : null;
+}
+
+// 從訊息中提取問題
+function extractQuestion(text) {
+  const qaMatch = text.match(/QA:\s*(.+?)(?:\n|$)/i);
+  return qaMatch ? qaMatch[1].trim() : null;
+}
+
+// 處理新增問題到 Notion
+async function handleNewQuestion(messageText, userId, replyToken) {
+  try {
+    // 提取專案名稱和問題
+    const project = extractProject(messageText);
+    const question = extractQuestion(messageText);
+    
+    if (!question) {
+      await lineClient.replyMessage(replyToken, {
+        type: 'text',
+        text: '請使用正確的格式：\nproject: 專案名稱\nQA: 您的問題'
+      });
+      return;
+    }
+
+    // 獲取用戶資料
+    const userProfile = await getUserProfile(userId);
+    console.log('用戶資料:', userProfile);
+
+    // 建立 Notion 頁面
     await notion.pages.create({
       parent: { database_id: NOTION_DATABASE_ID },
       properties: {
         question: {
-          title: [{ text: { content: questionText } }]
+          title: [{ text: { content: question } }]
+        },
+        project: {
+          rich_text: [{ text: { content: project || '未分類' } }]
+        },
+        user: {
+          rich_text: [{ text: { content: userProfile ? `${userProfile.displayName} (${userId})` : userId } }]
         },
         date: {
           date: { start: new Date().toISOString() }
@@ -134,10 +180,12 @@ export default async function handler(req, res) {
         const messageText = event.message.text?.trim();
         
         // 處理新的 QA 問題
-        if (event.message.type === 'text' && messageText?.startsWith('QA')) {
-          const questionText = messageText.substring(2).trim();
-          if (questionText) {
-            await handleNewQuestion(questionText, event.replyToken);
+        if (event.message.type === 'text' && 
+            (messageText?.toLowerCase().includes('qa:') || messageText?.toLowerCase().includes('project:'))) {
+          await handleNewQuestion(
+            messageText, 
+            event.source.userId, 
+            event.replyToken);
           }
         }
         // 處理回覆

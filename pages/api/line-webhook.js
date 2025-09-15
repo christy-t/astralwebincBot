@@ -15,17 +15,10 @@ export default async function handler(req, res) {
     return res.status(405).end();
   }
 
-  // 使用 Promise 來確保完整接收請求內容
-  const body = await new Promise((resolve, reject) => {
-    let data = '';
-    req.on('data', chunk => {
-      data += chunk;
-    });
-    req.on('end', () => resolve(data));
-    req.on('error', reject);
-  });
-
   try {
+    const body = JSON.parse(req.body);
+    console.log('收到 webhook:', JSON.stringify(body, null, 2));
+    const events = body.events || [];
     try {
       const parsedBody = JSON.parse(body);
       console.log('收到 webhook:', JSON.stringify(parsedBody, null, 2));
@@ -81,9 +74,21 @@ export default async function handler(req, res) {
           }
 
           // 處理回覆
-          const quotedMsg = event.message.quote?.text || event.message.quotedMessage?.text;
-          if (quotedMsg) {
-            console.log('處理回覆訊息:', quotedMsg);
+          if (event.message.quotedMessageId) {
+            console.log('處理回覆訊息:', event.message.text);
+            
+            try {
+              // 搜尋最近的問題
+              const response = await notion.databases.query({
+                database_id: NOTION_DATABASE_ID,
+                sorts: [
+                  {
+                    property: "date",
+                    direction: "descending"
+                  }
+                ],
+                page_size: 1
+              });
             const originalQuestion = quotedMsg.startsWith('QA') ? 
               quotedMsg.substring(2).trim() : quotedMsg.trim();
 
@@ -158,6 +163,6 @@ export default async function handler(req, res) {
 
 export const config = {
   api: {
-    bodyParser: false,
+    bodyParser: true,
   },
 };

@@ -21,29 +21,45 @@ async function getUserProfile(userId) {
   }
 }
 
-// 從訊息中提取專案名稱
-function extractProject(text) {
-  const projectMatch = text.match(/^project:\s*(.+?)(?:\n|$)/i);
-  return projectMatch ? projectMatch[1].trim() : null;
-}
+// 解析訊息內容
+function parseMessage(text) {
+  // 檢查是否是簡單模式 ("?" 開頭)
+  if (text.startsWith('?')) {
+    return {
+      project: '未分類',
+      question: text.substring(1).trim()
+    };
+  }
 
-// 從訊息中提取問題
-function extractQuestion(text) {
+  // 檢查標準格式 (project: xxx QA: xxx)
+  const projectMatch = text.match(/^project:\s*(.+?)(?:\n|QA:|$)/i);
   const qaMatch = text.match(/QA:\s*(.+?)(?:\n|$)/i);
-  return qaMatch ? qaMatch[1].trim() : null;
+
+  if (projectMatch || qaMatch) {
+    return {
+      project: projectMatch ? projectMatch[1].trim() : '未分類',
+      question: qaMatch ? qaMatch[1].trim() : null
+    };
+  }
+
+  // 如果不符合任何格式，返回 null
+  return null;
 }
 
 // 處理新增問題到 Notion
 async function handleNewQuestion(messageText, userId, replyToken) {
   try {
-    // 提取專案名稱和問題
-    const project = extractProject(messageText);
-    const question = extractQuestion(messageText);
+    // 解析訊息
+    const parsed = parseMessage(messageText);
     
-    if (!question) {
+    if (!parsed || !parsed.question) {
       await lineClient.replyMessage(replyToken, {
         type: 'text',
-        text: '請使用正確的格式：\nproject: 專案名稱\nQA: 您的問題'
+        text: '請使用以下格式：\n' +
+              '1. 簡單模式：?您的問題\n' +
+              '2. 完整模式：\n' +
+              'project: 專案名稱\n' +
+              'QA: 您的問題'
       });
       return;
     }
@@ -57,13 +73,13 @@ async function handleNewQuestion(messageText, userId, replyToken) {
       parent: { database_id: NOTION_DATABASE_ID },
       properties: {
         question: {
-          title: [{ text: { content: question } }]
+          title: [{ text: { content: parsed.question } }]
         },
         project: {
-          rich_text: [{ text: { content: project || '未分類' } }]
+          rich_text: [{ text: { content: parsed.project } }]
         },
         user: {
-          rich_text: [{ text: { content: userProfile ? `${userProfile.displayName} (${userId})` : userId } }]
+          rich_text: [{ text: { content: userProfile ? userProfile.displayName : '未知用戶' } }]
         },
         date: {
           date: { start: new Date().toISOString() }
@@ -181,7 +197,9 @@ const handler = async (req, res) => {
         
         // 處理新的 QA 問題
         if (event.message.type === 'text' && 
-            (messageText?.toLowerCase().includes('qa:') || messageText?.toLowerCase().includes('project:'))) {
+            (messageText?.startsWith('?') || 
+             messageText?.toLowerCase().includes('qa:') || 
+             messageText?.toLowerCase().includes('project:'))) {
           await handleNewQuestion(
             messageText, 
             event.source.userId, 

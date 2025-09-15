@@ -27,43 +27,94 @@ export default async function handler(req, res) {
       const events = parsedBody.events || [];
       
       for (const event of events) {
-        if (event.type === 'message' && event.message.type === 'text') {
-          const text = event.message.text.trim();
+        // 1. 處理新的 QA 問題
+        if (event.type === 'message' && 
+            (event.message.type === 'text' || event.message.type === 'image')) {
           
-          // 當訊息開頭是 QA
-          if (text.startsWith('QA')) {
-            try {
-              // 建立 Notion 頁面
-              await notion.pages.create({
-                parent: { database_id: NOTION_DATABASE_ID },
-                properties: {
-                  question: {
-                    title: [
-                      {
-                        text: { content: text }
-                      }
-                    ]
-                  },
-                  date: {
+          // 1.1 處理文字 QA
+          if (event.message.type === 'text') {
+            const text = event.message.text.trim();
+            if (text.startsWith('QA')) {
+              try {
+                await notion.pages.create({
+                  parent: { database_id: NOTION_DATABASE_ID },
+                  properties: {
+                    question: {
+                      title: [{ text: { content: text } }]
+                    },
                     date: {
-                      start: new Date().toISOString()
+                      date: { start: new Date().toISOString() }
                     }
+                  }
+                });
+                await lineClient.replyMessage(event.replyToken, {
+                  type: 'text',
+                  text: '已自動上傳到 Notion！'
+                });
+              } catch (err) {
+                console.error('Notion upload error:', err);
+                await lineClient.replyMessage(event.replyToken, {
+                  type: 'text',
+                  text: '上傳失敗，請稍後再試。'
+                });
+              }
+            }
+          }
+        }
+
+        // 2. 處理回覆（更新 answer）
+        if (event.type === 'message' && event.message.quotedMessage?.text?.startsWith('QA')) {
+          const questionText = event.message.quotedMessage.text;
+          try {
+            // 2.1 查找原始 QA 記錄
+            const response = await notion.databases.query({
+              database_id: NOTION_DATABASE_ID,
+              filter: {
+                property: 'question',
+                title: { equals: questionText }
+              }
+            });
+
+            if (response.results.length > 0) {
+              const page = response.results[0];
+              const oldAnswer = page.properties.answer?.rich_text?.[0]?.text?.content || '';
+              
+              // 2.2 處理新的回答內容
+              let newContent = '';
+              if (event.message.type === 'text') {
+                newContent = event.message.text;
+              } else if (event.message.type === 'image') {
+                // 只記錄有圖片，不上傳
+                const timestamp = new Date().toISOString();
+                newContent = `[${timestamp}] 收到圖片回覆（請查看 LINE 對話）`;
+              }
+
+              // 2.3 組合新舊回答
+              const newAnswer = oldAnswer 
+                ? `${oldAnswer}\n---\n${newContent}`
+                : newContent;
+
+              // 2.4 更新 Notion
+              await notion.pages.update({
+                page_id: page.id,
+                properties: {
+                  answer: {
+                    rich_text: [{ text: { content: newAnswer } }]
                   }
                 }
               });
 
-              // 回覆訊息
               await lineClient.replyMessage(event.replyToken, {
                 type: 'text',
-                text: '已自動上傳到 Notion！'
-              });
-            } catch (err) {
-              console.error('Notion upload error:', err);
-              await lineClient.replyMessage(event.replyToken, {
-                type: 'text',
-                text: '上傳 Notion 失敗，請稍後再試。'
+                text: '已更新回答到 Notion！'
               });
             }
+          } catch (err) {
+            console.error('Answer update error:', err);
+            await lineClient.replyMessage(event.replyToken, {
+              type: 'text',
+              text: '更新回答失敗，請稍後再試。'
+            });
           }
         }
       }

@@ -42,35 +42,57 @@ async function handleNewQuestion(questionText, replyToken) {
 async function handleReply(newContent, replyToken) {
   try {
     console.log('查詢 Notion 資料庫...');
-    // 使用 search API 來獲取最新的頁面
-    const response = await notion.search({
-      filter: {
-        property: 'object',
-        value: 'page'
-      },
-      sort: {
-        direction: 'descending',
-        timestamp: 'last_edited_time'
-      },
+    // 先獲取資料庫的結構
+    const database = await notion.databases.retrieve({
+      database_id: NOTION_DATABASE_ID
+    });
+    console.log('資料庫結構:', database);
+
+    // 查詢最新的頁面
+    const response = await notion.databases.query({
+      database_id: NOTION_DATABASE_ID,
+      sorts: [
+        {
+          timestamp: "created_time",
+          direction: "descending"
+        }
+      ],
       page_size: 1
     });
 
     if (response.results.length > 0) {
       const page = response.results[0];
-      const oldAnswer = page.properties.answer?.rich_text?.[0]?.text?.content || '';
+      console.log('找到頁面:', page);
       
+      // 獲取當前頁面的所有屬性
+      const pageDetail = await notion.pages.retrieve({
+        page_id: page.id
+      });
+      console.log('頁面詳細資訊:', pageDetail);
+      
+      // 尋找 rich_text 類型的屬性作為答案欄位
+      const answerPropId = Object.entries(database.properties)
+        .find(([_, prop]) => prop.type === 'rich_text' && (prop.name.toLowerCase() === 'answer' || prop.name.toLowerCase() === 'answers'))?.[0];
+
+      if (!answerPropId) {
+        throw new Error('找不到答案欄位，請確認資料庫結構');
+      }
+
+      const oldAnswer = page.properties[answerPropId]?.rich_text?.[0]?.text?.content || '';
       const newAnswer = oldAnswer 
         ? `${oldAnswer}\n---\n${newContent}`
         : newContent;
 
-      await notion.pages.update({
+      const updateData = {
         page_id: page.id,
-        properties: {
-          answer: {
-            rich_text: [{ text: { content: newAnswer } }]
-          }
-        }
-      });
+        properties: {}
+      };
+      updateData.properties[answerPropId] = {
+        rich_text: [{ text: { content: newAnswer } }]
+      };
+
+      console.log('更新資料:', updateData);
+      await notion.pages.update(updateData);
 
       await lineClient.replyMessage(replyToken, {
         type: 'text',

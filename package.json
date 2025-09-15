@@ -9,6 +9,8 @@
   "dependencies": {
     "next": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "@line/bot-sdk": "latest",
+    "@notionhq/client": "latest"
   }
 }

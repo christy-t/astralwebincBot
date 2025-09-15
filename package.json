@@ -1,17 +1,18 @@
 {
   "name": "line-notion-bot",
   "version": "1.0.0",
+  "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start"
   },
   "dependencies": {
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "@line/bot-sdk": "latest",
-    "@notionhq/client": "latest",
-    "imgur-anonymous-uploader": "latest"
+    "next": "^12.0.0",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2",
+    "@line/bot-sdk": "^7.5.2",
+    "@notionhq/client": "^2.2.3",
+    "imgur-anonymous-uploader": "^1.0.0"
   }
 }

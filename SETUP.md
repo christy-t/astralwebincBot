@@ -4,11 +4,12 @@
 
 ## 目錄
 1. [前置準備](#前置準備)
-2. [LINE Developer 設定](#line-developer-設定)
-3. [Notion API 設定](#notion-api-設定)
-4. [專案設定](#專案設定)
-5. [Vercel 部署](#vercel-部署)
-6. [測試與驗證](#測試與驗證)
+2. [GitHub 專案設定](#github-專案設定)
+3. [VS Code 開發環境](#vs-code-開發環境)
+4. [LINE Developer 設定](#line-developer-設定)
+5. [Notion API 設定](#notion-api-設定)
+6. [Vercel 部署](#vercel-部署)
+7. [開發與部署流程](#開發與部署流程)
 
 ## 前置準備
 

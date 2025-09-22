@@ -77,8 +77,7 @@ async function handleNewQuestion(messageText, userId, replyToken) {
         },
         project: {
           select: { 
-            name: parsed.project,
-            create_option: true  // 允許創建新選項
+            name: parsed.project || '未分類'  // 如果沒有 project，使用「未分類」
           }
         },
         user: {

@@ -46,6 +46,46 @@ function parseMessage(text) {
   return null;
 }
 
+// 檢查並更新 Project 選項
+async function updateProjectOptions(projectName) {
+  try {
+    // 獲取資料庫資訊
+    const database = await notion.databases.retrieve({
+      database_id: NOTION_DATABASE_ID
+    });
+
+    // 檢查 project 欄位是否存在且是 select 類型
+    const projectProperty = database.properties.project;
+    if (projectProperty?.type !== 'select') {
+      console.error('Project 欄位不是 select 類型');
+      return;
+    }
+
+    // 取得現有的選項
+    const currentOptions = projectProperty.select.options;
+    
+    // 檢查是否已存在該選項
+    const optionExists = currentOptions.some(option => option.name === projectName);
+    
+    // 如果選項不存在，新增它
+    if (!optionExists) {
+      await notion.databases.update({
+        database_id: NOTION_DATABASE_ID,
+        properties: {
+          project: {
+            select: {
+              options: [...currentOptions, { name: projectName }]
+            }
+          }
+        }
+      });
+      console.log(`已新增 project 選項: ${projectName}`);
+    }
+  } catch (error) {
+    console.error('更新 project 選項失敗:', error);
+  }
+}
+
 // 處理新增問題到 Notion
 async function handleNewQuestion(messageText, userId, replyToken) {
   try {
@@ -68,6 +108,11 @@ async function handleNewQuestion(messageText, userId, replyToken) {
     const userProfile = await getUserProfile(userId);
     console.log('用戶資料:', userProfile);
 
+    // 如果有指定 project，確保選項存在
+    if (parsed.project && parsed.project !== '未分類') {
+      await updateProjectOptions(parsed.project);
+    }
+
     // 建立 Notion 頁面
     await notion.pages.create({
       parent: { database_id: NOTION_DATABASE_ID },
@@ -77,7 +122,7 @@ async function handleNewQuestion(messageText, userId, replyToken) {
         },
         project: {
           select: { 
-            name: parsed.project || '未分類'  // 如果沒有 project，使用「未分類」
+            name: parsed.project || '未分類'
           }
         },
         user: {

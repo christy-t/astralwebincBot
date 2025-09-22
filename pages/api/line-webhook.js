@@ -76,7 +76,10 @@ async function handleNewQuestion(messageText, userId, replyToken) {
           title: [{ text: { content: parsed.question } }]
         },
         project: {
-          rich_text: [{ text: { content: parsed.project } }]
+          select: { 
+            name: parsed.project,
+            create_option: true  // 允許創建新選項
+          }
         },
         user: {
           rich_text: [{ text: { content: userProfile ? userProfile.displayName : '未知用戶' } }]
